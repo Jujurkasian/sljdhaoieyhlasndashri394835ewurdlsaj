@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Discovery</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: loading 1.5s infinite; }
+        @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        .movie-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .movie-card:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+        /* Popular scroller */
+        #popularScroller { display: flex; gap: 16px; overflow-x: auto; scroll-behavior: smooth; scrollbar-width: none; padding: 8px 4px; }
+        #popularScroller::-webkit-scrollbar { display: none; }
+        .popular-item { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; width: 80px; }
+        .popular-avatar { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 3px solid transparent; transition: border-color 0.2s, transform 0.2s; }
+        .popular-item:hover .popular-avatar { border-color: #6366f1; transform: scale(1.05); }
+        .popular-label { font-size: 11px; text-align: center; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 80px; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-gray-100">
+
+<div class="container mx-auto px-4 py-8 max-w-7xl">
+    <div class="text-center mb-8">
+        <h1 class="text-4xl md:text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">Movie Discovery</h1>
+        <p class="text-gray-500">Proxy Server + API Key (tersimpan di server)</p>
+    </div>
+
+    <!-- Popular Scroller -->
+    <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 shadow-sm mb-6 border">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-semibold text-gray-600">🔥 Paling Banyak Ditonton</h2>
+            <div class="flex gap-1">
+                <button id="scrollLeft" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-indigo-100 text-gray-600 flex items-center justify-center text-xs">‹</button>
+                <button id="scrollRight" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-indigo-100 text-gray-600 flex items-center justify-center text-xs">›</button>
+            </div>
+        </div>
+        <div id="popularScroller">
+            <!-- Skeleton -->
+            <div id="popularSkeleton" class="flex gap-4">
+                ${Array(10).fill(`<div class="flex flex-col items-center gap-2"><div class="w-18 h-18 rounded-full skeleton" style="width:72px;height:72px"></div><div class="skeleton h-3 w-16 rounded"></div></div>`).join('')}
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Panel -->
+    <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-5 shadow-sm mb-8 border">
+        <div class="flex flex-wrap gap-4 items-end">
+            <div class="flex-1 min-w-[150px]">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Mode Filter</label>
+                <select id="modeSelect" class="w-full px-3 py-2 rounded-lg border border-gray-300">
+                    <option value="all">📽️ Semua Film</option>
+                    <option value="category">🏷️ Berdasarkan Kategori</option>
+                    <option value="pornstar">🦸 Berdasarkan Pornstar</option>
+                </select>
+            </div>
+            <div class="flex-1 min-w-[200px]" id="categoryContainer" style="display:none;">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Pilih Kategori</label>
+                <select id="categorySelect" class="w-full px-3 py-2 rounded-lg border border-gray-300">
+                    <option value="">-- Muat kategori --</option>
+                </select>
+            </div>
+            <div class="flex-1 min-w-[200px]" id="pornstarContainer" style="display:none;">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Slug Pornstar</label>
+                <input type="text" id="pornstarSlug" placeholder="contoh: riley-reid" class="w-full px-3 py-2 rounded-lg border border-gray-300">
+            </div>
+            <div>
+                <button id="applyFilterBtn" class="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Terapkan</button>
+            </div>
+        </div>
+        <div class="text-xs text-gray-400 mt-3 border-t pt-2 flex justify-between">
+            <span>✅ Proxy server harus berjalan di http://localhost:3000</span>
+            <span>API key sudah diatur di server</span>
+        </div>
+    </div>
+
+    <!-- Info Bar -->
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+        <div class="bg-white/60 backdrop-blur-sm px-4 py-2 rounded-full text-sm">
+            <i class="fas fa-film text-indigo-500"></i> <span id="totalCount">0</span> film
+            <span class="mx-2">|</span> Halaman <span id="currentPageDisplay">1</span> / <span id="totalPagesDisplay">1</span>
+        </div>
+    </div>
+
+    <div id="movieGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 min-h-[400px]"></div>
+
+    <div class="flex justify-center gap-4 mt-10">
+        <button id="prevBtn" class="px-6 py-2 bg-white border rounded-xl disabled:opacity-50">← Prev</button>
+        <button id="nextBtn" class="px-6 py-2 bg-white border rounded-xl disabled:opacity-50">Next →</button>
+    </div>
+</div>
+
+<script>
+    const PROXY_URL = 'http://localhost:3000/api';
+    let currentPage = 1, totalPages = 1, totalItems = 0, isLoading = false;
+    let currentMode = 'all', currentCategorySlug = '', currentPornstarSlug = '';
+
+    const movieGrid       = document.getElementById('movieGrid');
+    const prevBtn         = document.getElementById('prevBtn');
+    const nextBtn         = document.getElementById('nextBtn');
+    const modeSelect      = document.getElementById('modeSelect');
+    const categoryContainer = document.getElementById('categoryContainer');
+    const pornstarContainer = document.getElementById('pornstarContainer');
+    const categorySelect  = document.getElementById('categorySelect');
+    const pornstarSlugInput = document.getElementById('pornstarSlug');
+    const applyBtn        = document.getElementById('applyFilterBtn');
+    const totalCountSpan  = document.getElementById('totalCount');
+    const currentPageSpan = document.getElementById('currentPageDisplay');
+    const totalPagesSpan  = document.getElementById('totalPagesDisplay');
+    const scroller        = document.getElementById('popularScroller');
+
+    // ===== API =====
+    async function apiFetch(endpoint, params = {}) {
+        const url = new URL(`${PROXY_URL}/${endpoint}`);
+        Object.keys(params).forEach(k => url.searchParams.append(k, params[k]));
+        const res = await fetch(url);
+        if (!res.ok) {
+            let msg = `HTTP ${res.status}`;
+            if (res.status === 401) msg = '401: API Key invalid';
+            if (res.status === 404) msg = '404: Tidak ditemukan';
+            if (res.status === 429) msg = '429: Rate limit';
+            throw new Error(msg);
+        }
+        return res.json();
+    }
+
+    function extractList(json) {
+        const inner = json?.data;
+        return {
+            data: inner?.data || [],
+            total: inner?.total || 0,
+            page: inner?.page || 1,
+            limit: inner?.limit || 10,
+            totalPages: inner?.totalPages || 1,
+        };
+    }
+
+    async function fetchMovies(page, limit = 10) {
+        let endpoint = 'movies';
+        let params = { page, limit };
+        if (currentMode === 'category' && currentCategorySlug) {
+            endpoint = `categories/${currentCategorySlug}/movies`;
+        } else if (currentMode === 'pornstar' && currentPornstarSlug) {
+            endpoint = `pornstars/${currentPornstarSlug}/movies`;
+        }
+        return extractList(await apiFetch(endpoint, params));
+    }
+
+    async function fetchCategories() {
+        return extractList(await apiFetch('categories', { page: 1, limit: 100 })).data;
+    }
+
+    async function fetchPopular() {
+        return extractList(await apiFetch('movies', { sort: 'views', limit: 20 })).data;
+    }
+
+    // ===== Popular Scroller =====
+    async function loadPopular() {
+        try {
+            const movies = await fetchPopular();
+            const skeleton = document.getElementById('popularSkeleton');
+            if (skeleton) skeleton.remove();
+
+            movies.forEach(m => {
+                const item = document.createElement('a');
+                item.href = `player.html?slug=${m.slug}`;
+                item.className = 'popular-item';
+                item.innerHTML = `
+                    <img class="popular-avatar" src="${m.thumbnail_url || m.poster_url || 'https://picsum.photos/72/72'}"
+                         onerror="this.src='https://picsum.photos/72/72'" alt="${escapeHtml(m.title)}">
+                    <span class="popular-label" title="${escapeHtml(m.title)}">${escapeHtml(m.title)}</span>
+                `;
+                scroller.appendChild(item);
+            });
+        } catch (e) {
+            console.warn('Gagal load popular:', e);
+        }
+    }
+
+    document.getElementById('scrollLeft').addEventListener('click', () => {
+        scroller.scrollBy({ left: -240, behavior: 'smooth' });
+    });
+    document.getElementById('scrollRight').addEventListener('click', () => {
+        scroller.scrollBy({ left: 240, behavior: 'smooth' });
+    });
+
+    // ===== Movies Grid =====
+    async function loadMovies(page = 1, limit = 10) {
+        if (isLoading) return;
+        isLoading = true;
+        showSkeletons(limit);
+        try {
+            const resp = await fetchMovies(page, limit);
+            currentPage = resp.page;
+            totalPages  = resp.totalPages;
+            totalItems  = resp.total;
+            renderMovies(resp.data);
+            updatePagination();
+        } catch (err) {
+            console.error(err);
+            showError(`Error: ${err.message}`);
+        } finally {
+            isLoading = false;
+        }
+    }
+
+    function showSkeletons(count) {
+        movieGrid.innerHTML = '';
+        for (let i = 0; i < count; i++) {
+            movieGrid.innerHTML += `<div class="bg-white rounded-xl animate-pulse"><div class="skeleton h-64"></div><div class="p-4 space-y-2"><div class="skeleton h-5 w-3/4"></div><div class="skeleton h-4 w-1/2"></div></div></div>`;
+        }
+    }
+
+    function renderMovies(movies) {
+        if (!movies.length) {
+            movieGrid.innerHTML = `<div class="col-span-full text-center py-20 text-gray-500">Tidak ada film ditemukan</div>`;
+            return;
+        }
+        movieGrid.innerHTML = movies.map(m => `
+            <div class="movie-card bg-white rounded-xl overflow-hidden shadow-sm border">
+                <img src="${m.thumbnail_url || m.poster_url || 'https://picsum.photos/300/450'}" class="h-64 w-full object-cover" onerror="this.src='https://picsum.photos/300/450'">
+                <div class="p-3">
+                    <h3 class="font-bold text-base">${escapeHtml(m.title || '-')}</h3>
+                    <div class="text-sm text-gray-500">👁 ${m.views?.toLocaleString() || '0'} · 🎬 ${m.quality || '?'}</div>
+                    <p class="text-gray-600 text-sm line-clamp-3 mt-2">${escapeHtml(m.description || '')}</p>
+                    <a href="player.html?slug=${m.slug}" class="mt-3 w-full py-1.5 border border-indigo-200 rounded-lg text-indigo-600 hover:bg-indigo-50 text-sm block text-center">▶ Tonton</a>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]));
+    }
+
+    function updatePagination() {
+        totalCountSpan.innerText  = totalItems;
+        currentPageSpan.innerText = currentPage;
+        totalPagesSpan.innerText  = totalPages;
+        prevBtn.disabled = currentPage <= 1;
+        nextBtn.disabled = currentPage >= totalPages;
+    }
+
+    function showError(msg) {
+        movieGrid.innerHTML = `<div class="col-span-full text-center py-16 text-red-500">${msg}</div>`;
+    }
+
+    async function loadCategoriesToDropdown() {
+        try {
+            const cats = await fetchCategories();
+            categorySelect.innerHTML = '<option value="">-- Pilih Kategori --</option>' +
+                cats.map(c => `<option value="${c.slug}">${c.name}</option>`).join('');
+        } catch (e) {
+            categorySelect.innerHTML = '<option value="">Gagal muat kategori</option>';
+        }
+    }
+
+    function onModeChange() {
+        currentMode = modeSelect.value;
+        categoryContainer.style.display = currentMode === 'category' ? 'block' : 'none';
+        pornstarContainer.style.display  = currentMode === 'pornstar'  ? 'block' : 'none';
+    }
+
+    function applyFilters() {
+        if (currentMode === 'category') {
+            currentCategorySlug = categorySelect.value;
+            if (!currentCategorySlug) return alert('Pilih kategori');
+            currentPornstarSlug = '';
+        } else if (currentMode === 'pornstar') {
+            currentPornstarSlug = pornstarSlugInput.value.trim();
+            if (!currentPornstarSlug) return alert('Masukkan slug pornstar');
+            currentCategorySlug = '';
+        } else {
+            currentCategorySlug = '';
+            currentPornstarSlug = '';
+        }
+        currentPage = 1;
+        loadMovies(1, 10);
+    }
+
+    // ===== Init =====
+    (async function init() {
+        modeSelect.addEventListener('change', onModeChange);
+        applyBtn.addEventListener('click', applyFilters);
+        prevBtn.addEventListener('click', () => { if (currentPage > 1) loadMovies(currentPage - 1, 10); });
+        nextBtn.addEventListener('click', () => { if (currentPage < totalPages) loadMovies(currentPage + 1, 10); });
+        onModeChange();
+        await Promise.all([
+            loadPopular(),
+            loadCategoriesToDropdown(),
+            loadMovies(1, 10),
+        ]);
+    })();
+</script>
+</body>
+</html>
