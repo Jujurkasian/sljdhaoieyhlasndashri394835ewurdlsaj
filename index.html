@@ -460,8 +460,14 @@ let state = {
 // ===== API =====
 async function api(endpoint, params = {}) {
   const url = new URL(`${PROXY}/${endpoint}`);
-  Object.entries(params).forEach(([k,v]) => { if(v !== '' && v !== null && v !== undefined) url.searchParams.append(k, v); });
-  const res = await fetch(url);
+  Object.entries(params).forEach(([k,v]) => { 
+    if(v !== '' && v !== null && v !== undefined) url.searchParams.append(k, v); 
+  });
+  const res = await fetch(url, {
+    headers: {
+      'ngrok-skip-browser-warning': 'true',  // ← ini yang fix
+    }
+  });
   const json = await res.json();
   if (!res.ok) throw new Error(json.message || `HTTP ${res.status}`);
   return json;

@@ -6,7 +6,12 @@ const PORT = 3000;
 
 const API_KEY = 'fd010e06008f4b8a19655400a197712d9f06ad4780304262675a15a891a15572';
 
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
 app.use(express.json());
 
 const API_BASE = 'https://porn-api.com/api/v1/public';
@@ -26,6 +31,7 @@ app.all('/api/*path', async (req, res) => {
       headers: {
         'Content-Type': 'application/json',
         'X-API-Key': API_KEY,
+        'ngrok-skip-browser-warning': 'true',
       },
     };
 
